@@ -76,8 +76,14 @@
         .trim-group label { font-size:0.75rem; font-weight:600; color:var(--text-secondary); display:block; margin-bottom:4px; }
         .trim-group input[type="range"] { width:100%; -webkit-appearance:none; height:6px; background:#333; border-radius:3px; }
         .trim-group input[type="range"]::-webkit-slider-thumb { -webkit-appearance:none; width:20px; height:20px; background:var(--accent); border:3px solid white; border-radius:50%; cursor:pointer; }
-        .time-display { display:flex; align-items:center; gap:8px; font-family:monospace; font-size:1.2rem; font-weight:700; margin-top:4px; }
+        .time-display { display:flex; align-items:center; gap:8px; font-family:monospace; font-size:1.2rem; font-weight:700; margin-top:4px; flex-wrap:wrap; }
         .time-val { background:#111; padding:6px 12px; border-radius:6px; }
+        .time-input { 
+            width: 80px; background:#111; border:1px solid #444; color:#fff; 
+            padding:6px 8px; border-radius:6px; font-family:monospace; font-size:0.9rem; 
+            text-align:center;
+        }
+        .fixed-buttons { display:flex; gap:6px; margin-top:8px; flex-wrap:wrap; }
         .subtitle-table-wrap { max-height:280px; overflow-y:auto; border-radius:var(--radius-sm); border:1px solid var(--border); }
         table.subtitle-table { width:100%; border-collapse:collapse; font-size:0.82rem; }
         table.subtitle-table th { background:#111; padding:10px 8px; text-align:left; font-size:0.7rem; color:var(--text-secondary); position:sticky; top:0; }
@@ -87,11 +93,6 @@
         .toast-container { position:fixed; top:16px; right:16px; z-index:300; display:flex; flex-direction:column; gap:8px; }
         .toast { background:#222; border:1px solid #444; color:#fff; padding:12px 18px; border-radius:8px; font-size:0.85rem; animation: slideIn 0.3s ease; max-width:300px; }
         @keyframes slideIn{ from{transform:translateX(120%);} to{transform:translateX(0);} }
-        .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:200; display:flex; align-items:center; justify-content:center; }
-        .modal { background:#1a1a1a; border:1px solid var(--border); border-radius:var(--radius); padding:28px; width:90%; max-width:420px; text-align:center; }
-        .progress-bar-wrap { background:#222; border-radius:8px; height:10px; margin:16px 0; }
-        .progress-bar-fill { height:100%; background:var(--accent); border-radius:8px; transition: width 0.5s; }
-        .flex-row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
         .spinner {
             display: inline-block; width: 16px; height: 16px;
             border: 2px solid rgba(255,255,255,0.3); border-radius: 50%;
@@ -133,17 +134,30 @@
                 <div class="trim-group">
                     <label>🎬 Inicio</label>
                     <input type="range" id="trim-start-range" min="0" max="100" value="0" step="0.1">
-                    <div class="time-display"><span class="time-val" id="trim-start-display">00:00</span><button class="btn btn-outline btn-xs" id="btn-mark-start">📍 Actual</button></div>
+                    <div class="time-display">
+                        <span class="time-val" id="trim-start-display">00:00</span>
+                        <input type="number" id="trim-start-input" class="time-input" step="0.1" min="0" placeholder="seg">
+                        <button class="btn btn-outline btn-xs" id="btn-mark-start">📍 Actual</button>
+                    </div>
                 </div>
                 <div class="trim-group">
                     <label>🏁 Fin</label>
                     <input type="range" id="trim-end-range" min="0" max="100" value="100" step="0.1">
-                    <div class="time-display"><span class="time-val" id="trim-end-display">00:00</span><button class="btn btn-outline btn-xs" id="btn-mark-end">📍 Actual</button></div>
+                    <div class="time-display">
+                        <span class="time-val" id="trim-end-display">00:00</span>
+                        <input type="number" id="trim-end-input" class="time-input" step="0.1" min="0" placeholder="seg">
+                        <button class="btn btn-outline btn-xs" id="btn-mark-end">📍 Actual</button>
+                    </div>
                 </div>
             </div>
-            <div style="display:flex; gap:8px; margin-top:10px;">
-                <button class="btn btn-outline btn-sm" id="btn-play-trim">▶ Reproducir clip</button>
-                <button class="btn btn-outline btn-sm" id="btn-reset-trim">↺ Reset</button>
+            <div class="fixed-buttons">
+                <span style="color:var(--text-secondary); font-size:0.8rem; margin-right:4px;">⏱ Rango fijo:</span>
+                <button class="btn btn-outline btn-xs fixed-duration" data-dur="5">5s</button>
+                <button class="btn btn-outline btn-xs fixed-duration" data-dur="10">10s</button>
+                <button class="btn btn-outline btn-xs fixed-duration" data-dur="15">15s</button>
+                <button class="btn btn-outline btn-xs fixed-duration" data-dur="20">20s</button>
+                <button class="btn btn-outline btn-xs" id="btn-play-trim" style="margin-left:auto;">▶ Reproducir clip</button>
+                <button class="btn btn-outline btn-xs" id="btn-reset-trim">↺ Reset</button>
             </div>
         </div>
 
@@ -165,20 +179,18 @@
         <!-- Exportar -->
         <div class="card" id="card-upload" style="display:none;">
             <div class="card-header"><span class="dot green"></span> Exportar Clip</div>
-            <p><strong id="summary-duration">00:00</strong> · <strong id="summary-subs">0</strong> subtítulos · Formato 9:16</p>
-            <div class="flex-row" style="margin-top:12px;">
-                <button class="btn btn-success" id="btn-download-zip" style="flex:1;">
+            <p><strong id="summary-duration">00:00</strong> · <strong id="summary-subs">0</strong> subtítulos</p>
+            <div style="margin-top:12px;">
+                <button class="btn btn-success" id="btn-download-zip" style="width:100%;">
                     <span id="download-text">📦 Descargar ZIP (MP4+Srt)</span>
                     <span id="download-spinner" class="spinner" style="display:none;"></span>
                 </button>
-                <button class="btn btn-accent" id="btn-upload-tiktok" style="flex:1;">🚀 Subir a TikTok (simulación)</button>
             </div>
             <p style="font-size:0.7rem; color:#555; margin-top:6px;">El ZIP contiene el video completo en MP4, subtítulos .srt y miniatura.</p>
         </div>
     </div>
 
     <div class="toast-container" id="toast-container"></div>
-    <div class="modal-overlay" id="modal-overlay" style="display:none;"><div class="modal" id="modal-content"></div></div>
 
     <script>
         // ==================== VARIABLES GLOBALES ====================
@@ -195,6 +207,7 @@
         const $subtitleOverlay = $('subtitle-overlay'), $currentTimeLive = $('current-time-live');
         const $trimStartRange = $('trim-start-range'), $trimEndRange = $('trim-end-range');
         const $trimStartDisplay = $('trim-start-display'), $trimEndDisplay = $('trim-end-display');
+        const $trimStartInput = $('trim-start-input'), $trimEndInput = $('trim-end-input');
         const $clipDurationBadge = $('clip-duration-badge');
         const $subtitleTbody = $('subtitle-tbody'), $subCount = $('sub-count');
         const $summaryDuration = $('summary-duration'), $summarySubs = $('summary-subs');
@@ -202,12 +215,11 @@
         const $btnPlayTrim = $('btn-play-trim'), $btnResetTrim = $('btn-reset-trim');
         const $btnAddSub = $('btn-add-sub'), $btnAddSubCurrent = $('btn-add-sub-current');
         const $btnAutoSubs = $('btn-auto-subs');
-        const $btnClearSubs = $('btn-clear-subs'), $btnUploadTiktok = $('btn-upload-tiktok');
+        const $btnClearSubs = $('btn-clear-subs');
         const $btnSaveProject = $('btn-save-project');
         const $btnDownloadZip = $('btn-download-zip');
         const $downloadText = $('download-text');
         const $downloadSpinner = $('download-spinner');
-        const $modalOverlay = $('modal-overlay'), $modalContent = $('modal-content');
         const $toastContainer = $('toast-container');
 
         // ==================== UTILIDADES ====================
@@ -335,6 +347,8 @@
         function updateTrimUI() {
             $trimStartRange.max = videoDuration; $trimEndRange.max = videoDuration;
             $trimStartRange.value = trimStart; $trimEndRange.value = trimEnd;
+            $trimStartInput.value = trimStart.toFixed(1);
+            $trimEndInput.value = trimEnd.toFixed(1);
             updateTrimDisplays(); updateClipDurationBadge();
         }
         function updateTrimDisplays() {
@@ -348,20 +362,57 @@
         function setTrimStart(val) {
             trimStart = Math.max(0, Math.min(val, trimEnd - 1));
             if (trimStart >= trimEnd) trimStart = Math.max(0, trimEnd - 1);
-            $trimStartRange.value = trimStart; updateTrimDisplays(); updateClipDurationBadge(); updateSummary();
+            $trimStartRange.value = trimStart;
+            $trimStartInput.value = trimStart.toFixed(1);
+            updateTrimDisplays(); updateClipDurationBadge(); updateSummary();
         }
         function setTrimEnd(val) {
             trimEnd = Math.min(videoDuration, Math.max(val, trimStart + 1));
             if (trimEnd <= trimStart) trimEnd = Math.min(videoDuration, trimStart + 1);
-            $trimEndRange.value = trimEnd; updateTrimDisplays(); updateClipDurationBadge(); updateSummary();
+            $trimEndRange.value = trimEnd;
+            $trimEndInput.value = trimEnd.toFixed(1);
+            updateTrimDisplays(); updateClipDurationBadge(); updateSummary();
+        }
+        function applyFixedDuration(dur) {
+            if (!playerReady) return;
+            const newEnd = trimStart + dur;
+            if (newEnd <= videoDuration) {
+                setTrimEnd(newEnd);
+            } else {
+                // Si excede, ajustar inicio hacia atrás
+                const newStart = Math.max(0, videoDuration - dur);
+                setTrimStart(newStart);
+                setTrimEnd(newStart + dur);
+            }
+            showToast(`⏱ Rango fijo de ${dur}s aplicado`, 'info');
         }
 
+        // Eventos sliders
         $trimStartRange.addEventListener('input', () => setTrimStart(parseFloat($trimStartRange.value)));
         $trimEndRange.addEventListener('input', () => setTrimEnd(parseFloat($trimEndRange.value)));
+
+        // Eventos inputs numéricos manuales
+        $trimStartInput.addEventListener('change', () => {
+            const val = parseFloat($trimStartInput.value);
+            if (!isNaN(val)) setTrimStart(val);
+        });
+        $trimEndInput.addEventListener('change', () => {
+            const val = parseFloat($trimEndInput.value);
+            if (!isNaN(val)) setTrimEnd(val);
+        });
+
         $btnMarkStart.addEventListener('click', () => { if(playerReady) setTrimStart(player.getCurrentTime()); });
         $btnMarkEnd.addEventListener('click', () => { if(playerReady) setTrimEnd(player.getCurrentTime()); });
         $btnPlayTrim.addEventListener('click', () => { if(playerReady) { player.seekTo(trimStart,true); player.playVideo(); } });
         $btnResetTrim.addEventListener('click', () => { trimStart=0; trimEnd=videoDuration; updateTrimUI(); updateSummary(); });
+
+        // Botones de duración fija
+        document.querySelectorAll('.fixed-duration').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const dur = parseInt(btn.dataset.dur);
+                applyFixedDuration(dur);
+            });
+        });
 
         // ==================== SUBTÍTULOS ====================
         function renderSubtitles() {
@@ -479,7 +530,7 @@
             showToast('🔄 Cargando...');
         });
 
-        // ==================== RESUMEN Y DESCARGA ZIP (CON MP4 REAL) ====================
+        // ==================== RESUMEN Y DESCARGA ZIP ====================
         function updateSummary() {
             const dur = Math.max(0, trimEnd - trimStart);
             $summaryDuration.textContent = formatTime(dur);
@@ -505,7 +556,6 @@
             if (!videoId) { showToast('❌ Sin video cargado', 'error'); return; }
             if (trimEnd - trimStart < 1) { showToast('⚠️ El clip debe durar al menos 1s', 'error'); return; }
 
-            // Mostrar estado de carga
             $btnDownloadZip.disabled = true;
             $downloadText.textContent = '⏳ Descargando video MP4...';
             $downloadSpinner.style.display = 'inline-block';
@@ -513,8 +563,6 @@
 
             try {
                 const zip = new JSZip();
-
-                // 1. Descargar video MP4 desde servicio público (puede tardar)
                 const videoUrl = `https://api.vevioz.com/@api/button/mp4/${videoId}`;
                 const videoResponse = await fetch(videoUrl);
                 if (!videoResponse.ok) throw new Error('No se pudo descargar el video (código ' + videoResponse.status + ')');
@@ -529,15 +577,12 @@
                 const videoBlob = await videoResponse.blob();
                 zip.file('clip.mp4', videoBlob, { binary: true });
 
-                // 2. Subtítulos SRT
                 const srtContent = generateSRT();
                 if (srtContent) zip.file('subtitulos.srt', srtContent);
 
-                // 3. Información
                 const info = `Clip generado con YT2TikTok\nURL original: https://youtu.be/${videoId}\nInicio: ${formatTimeMs(trimStart)}\nFin: ${formatTimeMs(trimEnd)}\nDuración: ${formatTime(trimEnd - trimStart)}\nSubtítulos: ${subtitles.length}\n`;
                 zip.file('info.txt', info);
 
-                // 4. Miniatura
                 try {
                     const imgResponse = await fetch(`https://img.youtube.com/vi/${videoId}/mqdefault.jpg`);
                     if (imgResponse.ok) {
@@ -546,7 +591,6 @@
                     }
                 } catch (e) {}
 
-                // Generar ZIP y descargar
                 const content = await zip.generateAsync({ type: 'blob' });
                 const filename = `clip_${videoId}_${formatTime(trimEnd - trimStart).replace(':', '-')}.zip`;
                 saveAs(content, filename);
@@ -562,36 +606,6 @@
         }
 
         $btnDownloadZip.addEventListener('click', downloadZip);
-
-        // ==================== SIMULACIÓN TIKTOK ====================
-        $btnUploadTiktok.addEventListener('click', () => {
-            if (trimEnd - trimStart < 1) { showToast('⚠️ El clip debe durar al menos 1s', 'error'); return; }
-            $modalOverlay.style.display = '';
-            $modalContent.innerHTML = `<h3>🚀 Procesando...</h3><div class="progress-bar-wrap"><div class="progress-bar-fill" id="progress-fill" style="width:0%"></div></div><p id="progress-step">Preparando</p>`;
-            const steps = [
-                { msg:'📥 Descargando...', pct:20, delay:1000 },
-                { msg:'✂️ Recortando...', pct:40, delay:900 },
-                { msg:'📝 Subtítulos...', pct:60, delay:1100 },
-                { msg:'📱 Optimizando 9:16...', pct:80, delay:1000 },
-                { msg:'☁️ Subiendo...', pct:95, delay:1400 },
-                { msg:'✅ ¡Publicado!', pct:100, delay:600 }
-            ];
-            let i=0;
-            function next() {
-                if(i>=steps.length) {
-                    $modalContent.innerHTML = `<div style="font-size:3rem;">✅</div><h3>Video listo en TikTok</h3><button class="btn btn-accent" id="btn-close-modal">Cerrar</button>`;
-                    $('btn-close-modal').addEventListener('click', ()=> $modalOverlay.style.display='none');
-                    return;
-                }
-                const s = steps[i];
-                $('progress-fill').style.width = s.pct+'%';
-                $('progress-step').textContent = s.msg;
-                i++;
-                setTimeout(next, s.delay);
-            }
-            next();
-        });
-        $modalOverlay.addEventListener('click', (e) => { if(e.target===$modalOverlay && $modalContent.querySelector('#btn-close-modal')) $modalOverlay.style.display='none'; });
 
         // ==================== GUARDADO LOCAL ====================
         function saveProjectToStorage() {

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=1.0, user-scalable=yes">
     <title>YT2TikTok · Recorta, Subtitula y Exporta</title>
-    <!-- ========== ESTILOS (conserva todo el diseño anterior) ========== -->
+    <!-- ========== ESTILOS (conserva el diseño anterior) ========== -->
     <style>
         :root {
             --bg: #0f0f0f;
@@ -60,6 +60,7 @@
         .btn-outline { background:transparent; border:2px solid var(--border); color:#fff; }
         .btn-success { background:#00c853; color:#000; }
         .btn-danger { background:#ff4444; color:#fff; }
+        .btn-info { background:#448aff; color:#fff; }
         .btn-sm { padding:7px 14px; font-size:0.8rem; }
         .btn-xs { padding:5px 10px; font-size:0.7rem; }
         .btn:disabled { opacity:0.4; cursor:not-allowed; }
@@ -91,9 +92,13 @@
         .modal { background:#1a1a1a; border:1px solid var(--border); border-radius:var(--radius); padding:28px; width:90%; max-width:420px; text-align:center; }
         .progress-bar-wrap { background:#222; border-radius:8px; height:10px; margin:16px 0; }
         .progress-bar-fill { height:100%; background:var(--accent); border-radius:8px; transition: width 0.5s; }
+        .flex-row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
     </style>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <!-- Librerías para generar y descargar ZIP -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 </head>
 <body>
     <header class="header">
@@ -144,9 +149,10 @@
             <div class="subtitle-table-wrap">
                 <table class="subtitle-table"><thead><tr><th>#</th><th>Texto</th><th>Inicio</th><th>Fin</th><th></th></tr></thead><tbody id="subtitle-tbody"></tbody></table>
             </div>
-            <div class="quick-actions" style="margin-top:10px; display:flex; gap:8px;">
+            <div class="quick-actions" style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
                 <button class="btn btn-accent btn-sm" id="btn-add-sub">➕ Añadir</button>
                 <button class="btn btn-outline btn-sm" id="btn-add-sub-current">📍 Desde ahora</button>
+                <button class="btn btn-info btn-sm" id="btn-auto-subs">🤖 Generar automáticos</button>
                 <button class="btn btn-outline btn-sm" id="btn-clear-subs">🗑 Limpiar</button>
                 <button class="btn btn-outline btn-sm" id="btn-save-project">💾 Guardar</button>
             </div>
@@ -154,9 +160,13 @@
 
         <!-- Exportar -->
         <div class="card" id="card-upload" style="display:none;">
-            <div class="card-header"><span class="dot green"></span> Exportar a TikTok</div>
+            <div class="card-header"><span class="dot green"></span> Exportar Clip</div>
             <p><strong id="summary-duration">00:00</strong> · <strong id="summary-subs">0</strong> subtítulos · Formato 9:16</p>
-            <button class="btn btn-success" id="btn-upload-tiktok" style="width:100%; margin-top:12px; padding:14px;">🚀 Subir a TikTok</button>
+            <div class="flex-row" style="margin-top:12px;">
+                <button class="btn btn-success" id="btn-download-zip" style="flex:1;">📦 Descargar ZIP</button>
+                <button class="btn btn-accent" id="btn-upload-tiktok" style="flex:1;">🚀 Subir a TikTok (simulación)</button>
+            </div>
+            <p style="font-size:0.7rem; color:#555; margin-top:6px;">El ZIP contiene el clip (placeholder), subtítulos .srt y miniatura.</p>
         </div>
     </div>
 
@@ -169,7 +179,7 @@
         let trimStart = 0, trimEnd = 0;
         let subtitles = [], subtitleIdCounter = 0, currentActiveSubId = null;
         let updateInterval = null;
-        const UPDATE_INTERVAL_MS = 220; // más suave
+        const UPDATE_INTERVAL_MS = 220;
 
         // ==================== ELEMENTOS DEL DOM ====================
         const $ = (id) => document.getElementById(id);
@@ -184,8 +194,10 @@
         const $btnMarkStart = $('btn-mark-start'), $btnMarkEnd = $('btn-mark-end');
         const $btnPlayTrim = $('btn-play-trim'), $btnResetTrim = $('btn-reset-trim');
         const $btnAddSub = $('btn-add-sub'), $btnAddSubCurrent = $('btn-add-sub-current');
+        const $btnAutoSubs = $('btn-auto-subs');
         const $btnClearSubs = $('btn-clear-subs'), $btnUploadTiktok = $('btn-upload-tiktok');
         const $btnSaveProject = $('btn-save-project');
+        const $btnDownloadZip = $('btn-download-zip');
         const $modalOverlay = $('modal-overlay'), $modalContent = $('modal-content');
         const $toastContainer = $('toast-container');
 
@@ -199,6 +211,14 @@
             if (isNaN(sec) || sec < 0) return '00:00.0';
             const m = Math.floor(sec / 60), s = Math.floor(sec % 60), ms = Math.floor((sec%1)*10);
             return String(m).padStart(2,'0')+':'+String(s).padStart(2,'0')+'.'+ms;
+        }
+        function formatTimeSrt(sec) {
+            // Formato SRT: HH:MM:SS,mmm
+            const h = Math.floor(sec / 3600);
+            const m = Math.floor((sec % 3600) / 60);
+            const s = Math.floor(sec % 60);
+            const ms = Math.floor((sec % 1) * 1000);
+            return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0')+','+String(ms).padStart(3,'0');
         }
         function showToast(msg, type='info') {
             const t = document.createElement('div'); t.className=`toast ${type}`; t.textContent=msg;
@@ -388,6 +408,59 @@
         $btnAddSubCurrent.addEventListener('click', () => { if(playerReady) addSubtitle('', player.getCurrentTime()); });
         $btnClearSubs.addEventListener('click', () => { if(subtitles.length && confirm('¿Eliminar todos?')) { subtitles=[]; renderSubtitles(); } });
 
+        // ==================== GENERACIÓN AUTOMÁTICA DE SUBTÍTULOS ====================
+        $btnAutoSubs.addEventListener('click', async () => {
+            if (!videoId) { showToast('❌ Carga un video primero', 'error'); return; }
+            $btnAutoSubs.disabled = true;
+            $btnAutoSubs.textContent = '⏳ Obteniendo transcripción...';
+            showToast('🔍 Buscando transcripción del video...', 'info');
+            try {
+                // Usar API no oficial youtubetranscript.com
+                const response = await fetch(`https://youtubetranscript.com/?v=${videoId}`);
+                if (!response.ok) throw new Error('Transcripción no disponible');
+                const data = await response.json();
+                if (!data || !data.events || data.events.length === 0) {
+                    throw new Error('No se encontraron subtítulos automáticos');
+                }
+                // data.events: array de {tStartMs, dDurationMs, segs: [{utf8}]}
+                // Convertir a nuestros subtítulos, filtrando por el rango de recorte actual
+                const newSubs = [];
+                for (const event of data.events) {
+                    const startSec = event.tStartMs / 1000;
+                    const durSec = event.dDurationMs ? event.dDurationMs / 1000 : 5;
+                    const endSec = startSec + durSec;
+                    // Solo incluir si se solapa con el recorte
+                    if (endSec > trimStart && startSec < trimEnd) {
+                        const text = event.segs ? event.segs.map(s => s.utf8).join(' ') : '';
+                        if (text.trim()) {
+                            newSubs.push({
+                                id: ++subtitleIdCounter,
+                                text: text.trim(),
+                                startTime: Math.max(trimStart, startSec),
+                                endTime: Math.min(trimEnd, endSec)
+                            });
+                        }
+                    }
+                }
+                if (newSubs.length === 0) {
+                    showToast('⚠️ No hay subtítulos en el fragmento seleccionado', 'info');
+                } else {
+                    // Ordenar y agregar
+                    newSubs.sort((a,b) => a.startTime - b.startTime);
+                    subtitles = subtitles.concat(newSubs);
+                    subtitles.sort((a,b) => a.startTime - b.startTime);
+                    renderSubtitles();
+                    showToast(`✅ ${newSubs.length} subtítulos generados automáticamente`, 'success');
+                }
+            } catch (err) {
+                console.error('Error generando subs:', err);
+                showToast('❌ No se pudieron obtener subtítulos automáticos. Prueba manualmente.', 'error');
+            } finally {
+                $btnAutoSubs.disabled = false;
+                $btnAutoSubs.textContent = '🤖 Generar automáticos';
+            }
+        });
+
         // ==================== CARGA DE VIDEO ====================
         $btnLoad.addEventListener('click', () => {
             const url = $youtubeUrl.value.trim();
@@ -406,40 +479,74 @@
             showToast('🔄 Cargando...');
         });
 
-        // ==================== RESUMEN / GUARDADO ====================
+        // ==================== RESUMEN Y DESCARGA ZIP ====================
         function updateSummary() {
             const dur = Math.max(0, trimEnd - trimStart);
             $summaryDuration.textContent = formatTime(dur);
             $summarySubs.textContent = subtitles.length;
         }
 
-        function saveProjectToStorage() {
-            const data = { videoId, trimStart, trimEnd, subtitles };
-            localStorage.setItem('yt2tiktok_project', JSON.stringify(data));
-            showToast('💾 Proyecto guardado', 'success');
-        }
-        function loadProjectFromStorage() {
-            const saved = localStorage.getItem('yt2tiktok_project');
-            if (!saved) return false;
-            try {
-                const data = JSON.parse(saved);
-                if (data.videoId) {
-                    $youtubeUrl.value = 'https://youtu.be/' + data.videoId;
-                    videoId = data.videoId;
-                    trimStart = data.trimStart || 0;
-                    trimEnd = data.trimEnd || 0;
-                    subtitles = data.subtitles || [];
-                    subtitleIdCounter = subtitles.reduce((max, s) => Math.max(max, s.id), 0);
-                    createPlayer(videoId);
-                    // Después de onReady se aplicarán trim y subs
-                    return true;
+        function generateSRT() {
+            // Generar contenido SRT ajustado al recorte (tiempos relativos al inicio del clip)
+            let srt = '';
+            const offset = trimStart;
+            subtitles.forEach((sub, idx) => {
+                const startRel = sub.startTime - offset;
+                const endRel = sub.endTime - offset;
+                if (endRel > 0 && startRel < (trimEnd - offset)) {
+                    const st = Math.max(0, startRel);
+                    const et = Math.min(trimEnd - offset, endRel);
+                    srt += `${idx+1}\n`;
+                    srt += `${formatTimeSrt(st)} --> ${formatTimeSrt(et)}\n`;
+                    srt += `${sub.text}\n\n`;
                 }
-            } catch(e) { console.warn('Error cargando proyecto'); }
-            return false;
+            });
+            return srt;
         }
-        $btnSaveProject.addEventListener('click', saveProjectToStorage);
 
-        // ==================== SIMULACIÓN TIKTOK ====================
+        async function downloadZip() {
+            if (!videoId) { showToast('❌ Sin video cargado', 'error'); return; }
+            if (trimEnd - trimStart < 1) { showToast('⚠️ El clip debe durar al menos 1s', 'error'); return; }
+
+            try {
+                const zip = new JSZip();
+                
+                // 1. Agregar subtítulos en formato SRT
+                const srtContent = generateSRT();
+                if (srtContent) zip.file('subtitulos.srt', srtContent);
+                else zip.file('subtitulos.srt', '(sin subtítulos)');
+
+                // 2. Agregar archivo de información
+                const info = `Clip generado con YT2TikTok\nURL original: https://youtu.be/${videoId}\nInicio: ${formatTimeMs(trimStart)}\nFin: ${formatTimeMs(trimEnd)}\nDuración: ${formatTime(trimEnd - trimStart)}\nSubtítulos: ${subtitles.length}\n`;
+                zip.file('info.txt', info);
+
+                // 3. Agregar miniatura del video (si se puede)
+                const imgUrl = `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`;
+                try {
+                    const imgResponse = await fetch(imgUrl);
+                    if (imgResponse.ok) {
+                        const blob = await imgResponse.blob();
+                        zip.file('miniatura.jpg', blob);
+                    }
+                } catch (e) { console.warn('No se pudo descargar miniatura'); }
+
+                // 4. Placeholder del clip (no podemos recortar sin backend, añadimos un archivo de texto explicativo)
+                zip.file('clip_placeholder.txt', 'El clip de video real requiere procesamiento con FFmpeg en un servidor. Este ZIP contiene los subtítulos y metadatos para que puedas procesarlo externamente.');
+
+                // Generar y descargar
+                const content = await zip.generateAsync({type:'blob'});
+                const filename = `clip_${videoId}_${formatTime(trimEnd-trimStart).replace(':','-')}.zip`;
+                saveAs(content, filename);
+                showToast('📦 ZIP descargado exitosamente', 'success');
+            } catch (err) {
+                console.error('Error generando ZIP:', err);
+                showToast('❌ Error al generar el ZIP', 'error');
+            }
+        }
+
+        $btnDownloadZip.addEventListener('click', downloadZip);
+
+        // ==================== SIMULACIÓN TIKTOK (mantenida) ====================
         $btnUploadTiktok.addEventListener('click', () => {
             if (trimEnd - trimStart < 1) { showToast('⚠️ El clip debe durar al menos 1s', 'error'); return; }
             $modalOverlay.style.display = '';
@@ -469,6 +576,32 @@
         });
         $modalOverlay.addEventListener('click', (e) => { if(e.target===$modalOverlay && $modalContent.querySelector('#btn-close-modal')) $modalOverlay.style.display='none'; });
 
+        // ==================== GUARDADO LOCAL ====================
+        function saveProjectToStorage() {
+            const data = { videoId, trimStart, trimEnd, subtitles };
+            localStorage.setItem('yt2tiktok_project', JSON.stringify(data));
+            showToast('💾 Proyecto guardado', 'success');
+        }
+        function loadProjectFromStorage() {
+            const saved = localStorage.getItem('yt2tiktok_project');
+            if (!saved) return false;
+            try {
+                const data = JSON.parse(saved);
+                if (data.videoId) {
+                    $youtubeUrl.value = 'https://youtu.be/' + data.videoId;
+                    videoId = data.videoId;
+                    trimStart = data.trimStart || 0;
+                    trimEnd = data.trimEnd || 0;
+                    subtitles = data.subtitles || [];
+                    subtitleIdCounter = subtitles.reduce((max, s) => Math.max(max, s.id), 0);
+                    createPlayer(videoId);
+                    return true;
+                }
+            } catch(e) { console.warn('Error cargando proyecto'); }
+            return false;
+        }
+        $btnSaveProject.addEventListener('click', saveProjectToStorage);
+
         // ==================== ATAJOS DE TECLADO ====================
         document.addEventListener('keydown', (e) => {
             if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.isContentEditable) return;
@@ -492,11 +625,12 @@
         function init() {
             loadYouTubeAPI();
             renderSubtitles();
-            // Intentar cargar proyecto previo
             if (!loadProjectFromStorage()) {
                 $cardPlayer.style.display = 'none'; $cardTrim.style.display = 'none'; $cardSubs.style.display = 'none'; $cardUpload.style.display = 'none';
             }
             console.log('🎬 YT2TikTok listo. Atajos: I/O recorte, S subtítulo, espacio play');
+            console.log('🤖 Generación automática de subtítulos desde transcripción de YouTube');
+            console.log('📦 Descarga ZIP con .srt, miniatura y datos');
         }
         init();
     </script>
